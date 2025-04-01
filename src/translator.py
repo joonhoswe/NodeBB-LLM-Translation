@@ -101,3 +101,33 @@ def detect_language(content: str) -> str:
         return "Chinese"
     else:
         return "English"  # Default to English if no match found
+    
+
+def query_llm_robust(post: str) -> tuple[bool, str]:
+    try:
+        is_english = False
+        try:
+            language = detect_language(post)
+
+            if language == "English":
+                is_english = True
+            elif "understand" in language or not language or language.strip() == "" or not language.isalnum() or len(language) > 20:
+                return (False, post)
+        except Exception as e:
+            return (False, post)
+
+        if is_english:
+            return (True, post)
+
+        try:
+            translation = translate_content(post)
+            if not translation or translation.strip() == "":
+                return (False, post)
+            return (False, translation)
+        except Exception as e:
+            return (False, post)
+
+    except Exception as e:
+        return (False, post)
+    
+    

@@ -137,3 +137,67 @@ def test_detect_language(test_case):
 
 
 # mock test 
+# from mock import patch
+from unittest.mock import patch
+import openai
+from src.translator import query_llm_robust
+
+import os
+import openai
+
+# Retrieve the API key from the environment variable
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
+
+client = openai.OpenAI(api_key=api_key)
+
+
+# @patch("src.translator.client.chat.completions.create")
+@patch.object(client.chat.completions, 'create')
+
+def test_unexpected_language(mocker):
+  # we mock the model's response to return a random message
+  mocker.return_value.choices[0].message.content = "I don't understand your request"
+
+  result = query_llm_robust("Hier ist dein erstes Beispiel.")
+  print(result)
+  # TODO assert the expected behavior
+  assert result[0] == False
+  assert result[1] == "Hier ist dein erstes Beispiel."
+
+@patch.object(client.chat.completions, 'create')
+def test_empty_response(mocker):
+    mocker.return_value.choices[0].message.content = ""
+
+    result = query_llm_robust("Bonjour, comment ça va?")
+
+    assert result[1] == "Bonjour, comment ça va?"
+
+@patch.object(client.chat.completions, 'create')
+def test_api_error(mocker):
+
+    mocker.side_effect = Exception("API connection error")
+
+    result = query_llm_robust("Guten Tag")
+
+    assert result == (False, "Guten Tag")
+
+@patch.object(client.chat.completions, 'create')
+def test_malformed_response(mocker):
+    mocker.return_value.choices[0].message.content = "{!@#$%^&*()}"
+
+    result = query_llm_robust("Wie geht es dir?")
+    print(result)
+    assert result[0] == False
+    assert result[1] == "Wie geht es dir?"
+
+@patch.object(client.chat.completions, 'create')
+def test_oversized_response(mocker):
+    mocker.return_value.choices[0].message.content = "English" * 10000
+
+    result = query_llm_robust("What is your name?")
+
+    assert result[0] == False
+    assert result[1] == "What is your name?"
+
