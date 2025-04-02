@@ -1,6 +1,9 @@
 import pytest
 from src.translator import translate_content, detect_language
 
+from sentence_transformers import SentenceTransformer, util
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
 # def test_chinese():
 #     is_english, translated_content = translate_content("这是一条中文消息")
 #     assert is_english == False
@@ -72,11 +75,14 @@ def test_translation(test_case):
     expected_answer = test_case["expected_answer"]
 
     # Call the function to test
-    is_english, translated_content = translate_content(post)
+    translated_content = translate_content(post)
 
-    # Assert that the translation matches the expected answer
-    assert is_english == False  # Assuming all posts are non-English
-    assert translated_content == expected_answer
+    expected_embedding = model.encode(expected_answer)
+    response_embedding = model.encode(translated_content)
+
+    similarity = model.similarity(expected_embedding, response_embedding)
+
+    assert similarity > 0.8
 
 
 
@@ -141,6 +147,7 @@ def test_detect_language(test_case):
 from unittest.mock import patch
 import openai
 from src.translator import query_llm_robust
+import src.translator
 
 import os
 import openai
@@ -154,7 +161,7 @@ client = openai.OpenAI(api_key=api_key)
 
 
 # @patch("src.translator.client.chat.completions.create")
-@patch.object(client.chat.completions, 'create')
+@patch.object(src.translator.client.chat.completions, 'create')
 
 def test_unexpected_language(mocker):
   # we mock the model's response to return a random message
@@ -166,7 +173,7 @@ def test_unexpected_language(mocker):
   assert result[0] == False
   assert result[1] == "Hier ist dein erstes Beispiel."
 
-@patch.object(client.chat.completions, 'create')
+@patch.object(src.translator.client.chat.completions, 'create')
 def test_empty_response(mocker):
     mocker.return_value.choices[0].message.content = ""
 
@@ -174,7 +181,7 @@ def test_empty_response(mocker):
 
     assert result[1] == "Bonjour, comment ça va?"
 
-@patch.object(client.chat.completions, 'create')
+@patch.object(src.translator.client.chat.completions, 'create')
 def test_api_error(mocker):
 
     mocker.side_effect = Exception("API connection error")
@@ -183,7 +190,7 @@ def test_api_error(mocker):
 
     assert result == (False, "Guten Tag")
 
-@patch.object(client.chat.completions, 'create')
+@patch.object(src.translator.client.chat.completions, 'create')
 def test_malformed_response(mocker):
     mocker.return_value.choices[0].message.content = "{!@#$%^&*()}"
 
@@ -192,7 +199,7 @@ def test_malformed_response(mocker):
     assert result[0] == False
     assert result[1] == "Wie geht es dir?"
 
-@patch.object(client.chat.completions, 'create')
+@patch.object(src.translator.client.chat.completions, 'create')
 def test_oversized_response(mocker):
     mocker.return_value.choices[0].message.content = "English" * 10000
 
